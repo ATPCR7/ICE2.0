@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ICE offline version 2.0</title>
+    <style>
+        body {
+            font-family: "Microsoft YaHei", sans-serif;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+        h1 {
+            color: #007aff;
+            font-size: 22px;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .form-item {
+            margin-bottom: 25px;
+        }
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: bold;
+            color: #333;
+        }
+        input[type="number"] {
+            width: 100%;
+            padding: 10px;
+            font-size: 16px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+        /* 连续变量输入框：仅视觉标记，无特殊样式 */
+        .no-scroll-input {
+            /* 可添加自定义样式区分，此处仅作类标识 */
+        }
+        .radio-group {
+            display: flex;
+            gap: 25px;
+            margin-top: 8px;
+            flex-wrap: wrap;
+        }
+        .radio-item {
+            display: flex;
+            align-items: center;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        .radio-circle {
+            width: 18px;
+            height: 18px;
+            border: 2px solid #007aff;
+            border-radius: 50%;
+            margin-right: 8px;
+            position: relative;
+            transition: background-color 0.2s;
+        }
+        .radio-circle.selected {
+            background-color: #007aff;
+        }
+        .radio-circle.selected::after {
+            content: '';
+            width: 8px;
+            height: 8px;
+            background-color: white;
+            border-radius: 50%;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+        }
+        .radio-item input[type="radio"] {
+            display: none;
+        }
+        button {
+            width: 100%;
+            padding: 12px;
+            background-color: #007aff;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            font-size: 18px;
+            cursor: pointer;
+            margin-top: 10px;
+        }
+        button:hover {
+            background-color: #0066cc;
+        }
+        .result-container {
+            margin-top: 30px;
+            padding: 15px;
+            border-radius: 4px;
+            border: 1px solid #eee;
+        }
+        .result-title {
+            font-size: 18px;
+            font-weight: bold;
+            margin-bottom: 10px;
+            color: #333;
+        }
+        .result-item {
+            font-size: 16px;
+            margin-bottom: 8px;
+        }
+        .risk-low {
+            color: #43a047;
+            font-weight: bold;
+        }
+        .risk-high {
+            color: #e53935;
+            font-weight: bold;
+        }
+        .required-mark {
+            color: #e53935;
+            margin-left: 4px;
+        }
+    </style>
+    <script>
+        // 页面加载完成后，为连续变量输入框绑定「禁用滚轮改值」事件
+        window.onload = function() {
+            // 获取所有连续变量输入框（类名为 no-scroll-input）
+            const noScrollInputs = document.querySelectorAll('.no-scroll-input');
+            noScrollInputs.forEach(input => {
+                // 拦截滚轮事件，阻止默认的「滚轮改数值」行为
+                input.addEventListener('wheel', function(e) {
+                    e.preventDefault(); // 阻止默认行为
+                }, { passive: false }); // passive: false 确保 preventDefault 生效
+
+                // 可选：聚焦时禁止滚轮（部分浏览器需额外处理）
+                input.addEventListener('focus', function() {
+                    const handleWheel = function(e) {
+                        e.preventDefault();
+                    };
+                    input.addEventListener('wheel', handleWheel);
+                    // 失焦时移除事件，避免影响其他元素
+                    input.addEventListener('blur', function() {
+                        input.removeEventListener('wheel', handleWheel);
+                    }, { once: true });
+                });
+            });
+        };
+
+        function selectRadio(groupName, value) {
+            document.querySelectorAll(`input[name="${groupName}"]`).forEach(radio => {
+                radio.parentElement.querySelector('.radio-circle').classList.remove('selected');
+            });
+            const selectedRadio = document.querySelector(`input[name="${groupName}"][value="${value}"]`);
+            if (selectedRadio) {
+                selectedRadio.parentElement.querySelector('.radio-circle').classList.add('selected');
+                selectedRadio.checked = true;
+            }
+        }
+
+        function calculate() {
+            // 获取输入值（添加年龄指标）
+            let age = parseFloat(document.getElementById('age').value);
+            let heightCm = parseFloat(document.getElementById('height').value); 
+            let weight = parseFloat(document.getElementById('weight').value); 
+            let preAnesthesiaTemp = parseFloat(document.getElementById('preAnesthesiaTemp').value);
+            let surgeryDuration = parseFloat(document.getElementById('surgeryDuration').value);
+            let anesthesiaMethod = document.querySelector('input[name="anesthesiaMethod"]:checked')?.value;
+            let limbSurgery = document.querySelector('input[name="limbSurgery"]:checked')?.value;
+            let chestSurgery = document.querySelector('input[name="chestSurgery"]:checked')?.value;
+            let abdominalSurgery = document.querySelector('input[name="abdominalSurgery"]:checked')?.value;
+
+            // 验证必填项（添加年龄验证）
+            if (!age || !heightCm || !weight || !preAnesthesiaTemp || !surgeryDuration || !anesthesiaMethod || !limbSurgery || !chestSurgery || !abdominalSurgery) {
+                alert('请填写所有必填字段！');
+                return;
+            }
+
+            // 计算BMI
+            let heightM = heightCm / 100;
+            let bmi = weight / (heightM * heightM);
+
+            // 变量编码（添加年龄变量x0）
+            const x0 = age;                        // 年龄
+            const x1 = preAnesthesiaTemp;          // 麻醉诱导前体温
+            const x2 = bmi;                        // BMI
+            const x3 = chestSurgery === '是' ? 1 : 0; // 胸部手术
+            const x4 = limbSurgery === '是' ? 1 : 0;  // 肢体手术
+            const x5 = abdominalSurgery === '是' ? 1 : 0; // 腹部手术
+            const x6 = anesthesiaMethod === '全麻+硬膜外和/或神经阻滞麻醉' ? 1 : 0; // 麻醉方式
+            const x7 = surgeryDuration;            // 预计手术时长
+
+            // 更新后的回归系数
+            const a = 0.0125945373672139;   // 年龄系数（x0）
+            const b = -3.09524972145755;    // 麻醉诱导前体温系数（x1）
+            const c = -0.0699823704818403;  // BMI系数（x2）
+            const d = 1.06554960477089;                    // 胸部手术系数（x3，未提供新值）
+            const e = 0.444877711568004;    // 肢体手术系数（x4）
+            const f = 0.257020681980495;    // 腹部手术系数（x5）
+            const g = 0.832300975219438;    // 麻醉方式系数（x6）
+            const h = 0.00437711443906528;  // 预计手术时长系数（x7）
+            const i = 112.150015344064;     // 常数项
+
+            // 计算log值（包含年龄项）
+            const log = a * x0 + b * x1 + c * x2 + d * x3 + e * x4 + f * x5 + g * x6 + h * x7 + i;
+            
+            // 计算风险概率
+            const probability = 1 / (1 + Math.exp(-log)) * 100;
+
+            // 风险等级判断
+            let riskLevel, riskClass;
+            if (probability < 37.66) {
+                riskLevel = '低风险';
+                riskClass = 'risk-low';
+            } else {
+                riskLevel = '高风险';
+                riskClass = 'risk-high';
+            }
+
+            // 显示结果
+            const resultContainer = document.getElementById('resultContainer');
+            resultContainer.innerHTML = `
+                <div class="result-title">预测结果</div>
+                <div class="result-item">术中低体温发生风险：${probability.toFixed(2)}%</div>
+                <div class="result-item ${riskClass}">风险等级：${riskLevel}</div>
+            `;
+        }
+    </script>
+</head>
+<body>
+    <h1>ICE offline version 2.0</h1>
+    <form>
+        <!-- 新增年龄输入项 -->
+        <div class="form-item">
+            <label for="age">年龄（岁）<span class="required-mark">*</span>：</label>
+            <input type="number" id="age" class="no-scroll-input" required placeholder="例如：65">
+        </div>
+
+        <!-- 1. 身高（连续变量：添加 no-scroll-input 类，禁用滚轮改值） -->
+        <div class="form-item">
+            <label for="height">身高（厘米）<span class="required-mark">*</span>：</label>
+            <input type="number" id="height" class="no-scroll-input" required placeholder="例如：175">
+        </div>
+
+        <!-- 2. 体重（连续变量：添加 no-scroll-input 类） -->
+        <div class="form-item">
+            <label for="weight">体重（千克）<span class="required-mark">*</span>：</label>
+            <input type="number" step="0.1" id="weight" class="no-scroll-input" required placeholder="例如：65">
+        </div>
+
+        <!-- 3. 麻醉诱导前体温（连续变量：添加 no-scroll-input 类） -->
+        <div class="form-item">
+            <label for="preAnesthesiaTemp">麻醉诱导前体温（℃）<span class="required-mark">*</span>：</label>
+            <input type="number" step="0.1" id="preAnesthesiaTemp" class="no-scroll-input" required placeholder="例如：36.5">
+        </div>
+
+        <!-- 4. 预计手术时长（连续变量：添加 no-scroll-input 类） -->
+        <div class="form-item">
+            <label for="surgeryDuration">预计手术时长（分钟）<span class="required-mark">*</span>：</label>
+            <input type="number" id="surgeryDuration" class="no-scroll-input" required placeholder="例如：90">
+        </div>
+
+        <!-- 5. 麻醉方式（分类变量：无需禁用滚轮） -->
+        <div class="form-item">
+            <label>麻醉方式<span class="required-mark">*</span>：</label>
+            <div class="radio-group">
+                <div class="radio-item" onclick="selectRadio('anesthesiaMethod', '全麻+硬膜外和/或神经阻滞麻醉')">
+                    <input type="radio" name="anesthesiaMethod" value="全麻+硬膜外和/或神经阻滞麻醉" hidden>
+                    <div class="radio-circle"></div>
+                    <span>全麻+硬膜外和/或神经阻滞</span>
+                </div>
+                <div class="radio-item" onclick="selectRadio('anesthesiaMethod', '其他')">
+                    <input type="radio" name="anesthesiaMethod" value="其他" hidden>
+                    <div class="radio-circle"></div>
+                    <span>其他</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- 6. 胸部手术（分类变量） -->
+        <div class="form-item">
+            <label>胸部手术<span class="required-mark">*</span>：</label>
+            <div class="radio-group">
+                <div class="radio-item" onclick="selectRadio('chestSurgery', '是')">
+                    <input type="radio" name="chestSurgery" value="是" hidden>
+                    <div class="radio-circle"></div>
+                    <span>是</span>
+                </div>
+                <div class="radio-item" onclick="selectRadio('chestSurgery', '否')">
+                    <input type="radio" name="chestSurgery" value="否" hidden>
+                    <div class="radio-circle"></div>
+                    <span>否</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- 7. 肢体手术（分类变量） -->
+        <div class="form-item">
+            <label>肢体手术 (除手掌与足部手术)<span class="required-mark">*</span>：</label>
+            <div class="radio-group">
+                <div class="radio-item" onclick="selectRadio('limbSurgery', '是')">
+                    <input type="radio" name="limbSurgery" value="是" hidden>
+                    <div class="radio-circle"></div>
+                    <span>是</span>
+                </div>
+                <div class="radio-item" onclick="selectRadio('limbSurgery', '否')">
+                    <input type="radio" name="limbSurgery" value="否" hidden>
+                    <div class="radio-circle"></div>
+                    <span>否</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- 8. 腹部手术（分类变量） -->
+        <div class="form-item">
+            <label>腹部手术<span class="required-mark">*</span>：</label>
+            <div class="radio-group">
+                <div class="radio-item" onclick="selectRadio('abdominalSurgery', '是')">
+                    <input type="radio" name="abdominalSurgery" value="是" hidden>
+                    <div class="radio-circle"></div>
+                    <span>是</span>
+                </div>
+                <div class="radio-item" onclick="selectRadio('abdominalSurgery', '否')">
+                    <input type="radio" name="abdominalSurgery" value="否" hidden>
+                    <div class="radio-circle"></div>
+                    <span>否</span>
+                </div>
+            </div>
+        </div>
+
+        <button type="button" onclick="calculate()">计算术中低体温风险</button>
+    </form>
+
+    <div id="resultContainer" class="result-container"></div>
+</body>
+</html>
+    
